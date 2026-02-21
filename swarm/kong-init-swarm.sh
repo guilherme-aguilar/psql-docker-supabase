@@ -3,9 +3,14 @@ set -e
 
 apk add --no-cache gettext
 
-# No Swarm, secrets ficam em /run/secrets/<nome>
-export KONG_ADMIN_USER=$(cat /run/secrets/kong_admin_user)
-export KONG_ADMIN_PASSWORD=$(cat /run/secrets/kong_admin_password)
+# Debug: mostra se as variáveis chegaram
+echo "KONG_ADMIN_USER=${KONG_ADMIN_USER}"
+echo "KONG_ADMIN_PASSWORD=${KONG_ADMIN_PASSWORD}"
+
+if [ -z "$KONG_ADMIN_USER" ] || [ -z "$KONG_ADMIN_PASSWORD" ]; then
+  echo "ERRO: KONG_ADMIN_USER ou KONG_ADMIN_PASSWORD não definidos!"
+  exit 1
+fi
 
 envsubst '${KONG_ADMIN_USER} ${KONG_ADMIN_PASSWORD}' \
   < /tmp/kong-template.yml \

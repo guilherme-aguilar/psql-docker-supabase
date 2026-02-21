@@ -1,4 +1,5 @@
 services:
+
   # ─── PostgreSQL ───────────────────────────────────────────────
   db:
     image: supabase/postgres:15.8.1.060
@@ -22,6 +23,7 @@ services:
       placement:
         constraints:
           - node.role == manager
+
   # ─── Supavisor ────────────────────────────────────────────────
   supavisor:
     image: supabase/supavisor:2.5.1
@@ -45,6 +47,9 @@ services:
       replicas: 1
       restart_policy:
         condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager
 
   # ─── pg-meta ──────────────────────────────────────────────────
   meta:
@@ -60,6 +65,9 @@ services:
       replicas: 1
       restart_policy:
         condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager
 
   # ─── Kong Init (gera kong.yml e desliga) ──────────────────────
   kong-init:
@@ -70,9 +78,9 @@ services:
     volumes:
       - kong-config:/var/lib/kong
     configs:
-      - source: kong_template_v1
+      - source: kong_template
         target: /tmp/kong-template.yml
-      - source: kong_init_script_v1
+      - source: kong_init_script
         target: /tmp/kong-init.sh
         mode: 0755
     command: sh /tmp/kong-init.sh
@@ -80,6 +88,9 @@ services:
       replicas: 1
       restart_policy:
         condition: none
+      placement:
+        constraints:
+          - node.role == manager   # mesmo nó que o kong
 
   # ─── Kong (API Gateway) ───────────────────────────────────────
   kong:
@@ -99,6 +110,9 @@ services:
       replicas: 1
       restart_policy:
         condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager   # mesmo nó que o kong-init
 
   # ─── Supabase Studio ──────────────────────────────────────────
   studio:
@@ -117,6 +131,9 @@ services:
       replicas: 1
       restart_policy:
         condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager
 
 volumes:
   db-data:
@@ -125,7 +142,7 @@ volumes:
     driver: local
 
 configs:
-  kong_template_v1:
+  kong_template:
     file: ./kong-template.yml
-  kong_init_script_v1:
+  kong_init_script:
     file: ./kong-init-swarm.sh
