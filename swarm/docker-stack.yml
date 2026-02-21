@@ -5,15 +5,12 @@ services:
     image: supabase/postgres:15.8.1.060
     environment:
       POSTGRES_HOST: /var/run/postgresql
-      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: postgres
-      JWT_SECRET_FILE: /run/secrets/jwt_secret
+      JWT_SECRET: ${JWT_SECRET}
       POSTGRES_HOST_AUTH_METHOD: md5
     volumes:
       - db-data:/var/lib/postgresql/data
-    secrets:
-      - postgres_password
-      - jwt_secret
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -h localhost"]
       interval: 5s
@@ -37,21 +34,15 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       POSTGRES_DB: postgres
-      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
-      DATABASE_URL_FILE: /run/secrets/supavisor_database_url
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_URL: "ecto://supabase_admin:${POSTGRES_PASSWORD}@db:5432/postgres"
       CLUSTER_POSTGRES: "true"
-      SECRET_KEY_BASE_FILE: /run/secrets/secret_key_base
-      VAULT_ENC_KEY_FILE: /run/secrets/vault_enc_key
-      API_JWT_SECRET_FILE: /run/secrets/jwt_secret
-      METRICS_JWT_SECRET_FILE: /run/secrets/jwt_secret
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      VAULT_ENC_KEY: ${VAULT_ENC_KEY}
+      API_JWT_SECRET: ${JWT_SECRET}
+      METRICS_JWT_SECRET: ${JWT_SECRET}
       REGION: local
       ERL_AFLAGS: -proto_dist inet_tcp
-    secrets:
-      - postgres_password
-      - jwt_secret
-      - secret_key_base
-      - vault_enc_key
-      - supavisor_database_url
     deploy:
       replicas: 1
       restart_policy:
@@ -66,9 +57,7 @@ services:
       PG_META_DB_PORT: 5432
       PG_META_DB_NAME: postgres
       PG_META_DB_USER: supabase_admin
-      PG_META_DB_PASSWORD_FILE: /run/secrets/postgres_password
-    secrets:
-      - postgres_password
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
     deploy:
       replicas: 1
       restart_policy:
@@ -78,8 +67,8 @@ services:
   kong-init:
     image: alpine:3.19
     environment:
-      KONG_ADMIN_USER_FILE: /run/secrets/kong_admin_user
-      KONG_ADMIN_PASSWORD_FILE: /run/secrets/kong_admin_password
+      KONG_ADMIN_USER: ${KONG_ADMIN_USER}
+      KONG_ADMIN_PASSWORD: ${KONG_ADMIN_PASSWORD}
     volumes:
       - kong-config:/var/lib/kong
     configs:
@@ -88,9 +77,6 @@ services:
       - source: kong_init_script
         target: /tmp/kong-init.sh
         mode: 0755
-    secrets:
-      - kong_admin_user
-      - kong_admin_password
     command: sh /tmp/kong-init.sh
     deploy:
       replicas: 1
@@ -121,19 +107,14 @@ services:
     image: supabase/studio:20250113-83c9420
     environment:
       STUDIO_PG_META_URL: http://meta:8080
-      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       DEFAULT_ORGANIZATION_NAME: ${STUDIO_DEFAULT_ORGANIZATION:-Minha Empresa}
       DEFAULT_PROJECT_NAME: ${STUDIO_DEFAULT_PROJECT:-Meu Projeto}
       SUPABASE_URL: http://kong:8000
       SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8000}
-      SUPABASE_ANON_KEY_FILE: /run/secrets/anon_key
-      SUPABASE_SERVICE_KEY_FILE: /run/secrets/service_role_key
-      AUTH_JWT_SECRET_FILE: /run/secrets/jwt_secret
-    secrets:
-      - postgres_password
-      - jwt_secret
-      - anon_key
-      - service_role_key
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
     deploy:
       replicas: 1
       restart_policy:
@@ -150,23 +131,3 @@ configs:
     file: ./kong-template.yml
   kong_init_script:
     file: ./kong-init-swarm.sh
-
-secrets:
-  postgres_password:
-    external: true
-  jwt_secret:
-    external: true
-  anon_key:
-    external: true
-  service_role_key:
-    external: true
-  secret_key_base:
-    external: true
-  vault_enc_key:
-    external: true
-  kong_admin_user:
-    external: true
-  kong_admin_password:
-    external: true
-  supavisor_database_url:
-    external: true
