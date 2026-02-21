@@ -1,0 +1,51 @@
+_format_version: "1.1"
+
+consumers:
+  - username: ${KONG_ADMIN_USER}
+    basicauth_credentials:
+      - username: ${KONG_ADMIN_USER}
+        password: ${KONG_ADMIN_PASSWORD}
+
+services:
+
+  - name: pg-meta
+    url: http://meta:8080
+    routes:
+      - name: pg-meta-all
+        strip_path: true
+        paths:
+          - /pg/
+
+  - name: studio
+    url: http://studio:3000
+    routes:
+      - name: studio-route
+        strip_path: false
+        paths:
+          - /
+        regex_priority: 0
+    plugins:
+      - name: basic-auth
+        config:
+          hide_credentials: true
+
+plugins:
+  - name: cors
+    config:
+      origins:
+        - "*"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      headers:
+        - Accept
+        - Authorization
+        - Content-Type
+        - apikey
+        - X-Client-Info
+      max_age: 1728000
+      credentials: true

@@ -1,0 +1,174 @@
+name: supabase
+
+services:
+
+  # ─── PostgreSQL ───────────────────────────────────────────────
+  db:
+    image: supabase/postgres:15.8.1.060
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_DB: postgres
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
+      POSTGRES_HOST_AUTH_METHOD: md5
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    secrets:
+      - postgres_password
+      - jwt_secret
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -h localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager
+
+  # ─── Supavisor ────────────────────────────────────────────────
+  supavisor:
+    image: supabase/supavisor:2.5.1
+    ports:
+      - "6543:6543"
+      - "5433:5433"
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      DATABASE_URL_FILE: /run/secrets/supavisor_database_url
+      CLUSTER_POSTGRES: "true"
+      SECRET_KEY_BASE_FILE: /run/secrets/secret_key_base
+      VAULT_ENC_KEY_FILE: /run/secrets/vault_enc_key
+      API_JWT_SECRET_FILE: /run/secrets/jwt_secret
+      METRICS_JWT_SECRET_FILE: /run/secrets/jwt_secret
+      REGION: local
+      ERL_AFLAGS: -proto_dist inet_tcp
+    secrets:
+      - postgres_password
+      - jwt_secret
+      - secret_key_base
+      - vault_enc_key
+      - supavisor_database_url
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  # ─── pg-meta ──────────────────────────────────────────────────
+  meta:
+    image: supabase/postgres-meta:v0.84.2
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: db
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: supabase_admin
+      PG_META_DB_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  # ─── Kong Init (gera kong.yml e desliga) ──────────────────────
+  kong-init:
+    image: alpine:3.19
+    environment:
+      KONG_ADMIN_USER_FILE: /run/secrets/kong_admin_user
+      KONG_ADMIN_PASSWORD_FILE: /run/secrets/kong_admin_password
+    volumes:
+      - kong-config:/var/lib/kong
+    configs:
+      - source: kong_template
+        target: /tmp/kong-template.yml
+      - source: kong_init_script
+        target: /tmp/kong-init.sh
+        mode: 0755
+    secrets:
+      - kong_admin_user
+      - kong_admin_password
+    command: sh /tmp/kong-init.sh
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: none
+
+  # ─── Kong (API Gateway) ───────────────────────────────────────
+  kong:
+    image: kong:2.8.1
+    ports:
+      - "8000:8000"
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+    volumes:
+      - kong-config:/var/lib/kong
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  # ─── Supabase Studio ──────────────────────────────────────────
+  studio:
+    image: supabase/studio:20250113-83c9420
+    environment:
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      DEFAULT_ORGANIZATION_NAME: ${STUDIO_DEFAULT_ORGANIZATION:-Minha Empresa}
+      DEFAULT_PROJECT_NAME: ${STUDIO_DEFAULT_PROJECT:-Meu Projeto}
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8000}
+      SUPABASE_ANON_KEY_FILE: /run/secrets/anon_key
+      SUPABASE_SERVICE_KEY_FILE: /run/secrets/service_role_key
+      AUTH_JWT_SECRET_FILE: /run/secrets/jwt_secret
+    secrets:
+      - postgres_password
+      - jwt_secret
+      - anon_key
+      - service_role_key
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+volumes:
+  db-data:
+    driver: local
+  kong-config:
+    driver: local
+
+configs:
+  kong_template:
+    file: ./kong-template.yml
+  kong_init_script:
+    file: ./kong-init-swarm.sh
+
+secrets:
+  postgres_password:
+    external: true
+  jwt_secret:
+    external: true
+  anon_key:
+    external: true
+  service_role_key:
+    external: true
+  secret_key_base:
+    external: true
+  vault_enc_key:
+    external: true
+  kong_admin_user:
+    external: true
+  kong_admin_password:
+    external: true
+  supavisor_database_url:
+    external: true
