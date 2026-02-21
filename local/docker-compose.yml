@@ -1,0 +1,90 @@
+name: supabase-local
+
+services:
+
+  # ─── PostgreSQL ───────────────────────────────────────────────
+  db:
+    image: supabase/postgres:15.8.1.060
+    container_name: supabase-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your-super-secret-password}
+      POSTGRES_DB: postgres
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters}
+      POSTGRES_HOST_AUTH_METHOD: md5
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -h localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ─── Supavisor ────────────────────────────────────────────────
+  supavisor:
+    image: supabase/supavisor:2.5.1
+    container_name: supabase-supavisor
+    restart: unless-stopped
+    ports:
+      - "6543:6543"   # Transaction mode
+      - "5433:5433"   # Session mode
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your-super-secret-password}
+      DATABASE_URL: "ecto://supabase_admin:${POSTGRES_PASSWORD:-your-super-secret-password}@db:5432/postgres"
+      CLUSTER_POSTGRES: "true"
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-EArlzJWMDFHhMkSHpDrPPSAVoWDMlREYHGFAJQfWzfRuHBFxlXVtKnuHi2BpRq}
+      VAULT_ENC_KEY: ${VAULT_ENC_KEY:-your-16-or-32-chars-enc-key!!!!}
+      API_JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters}
+      METRICS_JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters}
+      REGION: local
+      ERL_AFLAGS: -proto_dist inet_tcp
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ─── pg-meta ──────────────────────────────────────────────────
+  meta:
+    image: supabase/postgres-meta:v0.84.2
+    container_name: supabase-meta
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: db
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: supabase_admin
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD:-your-super-secret-password}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ─── Supabase Studio ──────────────────────────────────────────
+  studio:
+    image: supabase/studio:20250113-83c9420
+    container_name: supabase-studio
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your-super-secret-password}
+      DEFAULT_ORGANIZATION_NAME: ${STUDIO_DEFAULT_ORGANIZATION:-Local Dev}
+      DEFAULT_PROJECT_NAME: ${STUDIO_DEFAULT_PROJECT:-Local Project}
+      SUPABASE_URL: http://localhost:8080
+      SUPABASE_PUBLIC_URL: http://localhost:3000
+      SUPABASE_ANON_KEY: ${ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTY0MTc2OTIwMCwiZXhwIjo5OTk5OTk5OTk5fQ._dLXMhxFSLBXVFLGlMnIwXnFjKjlvLnLnPZRGBqPLd0}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNjQxNzY5MjAwLCJleHAiOjk5OTk5OTk5OTl9.s6jL1JL3c2M1Cq3dPbCXuC4X2LLLhJWwkqpVJZGp9NU}
+      AUTH_JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters}
+    depends_on:
+      - meta
+
+volumes:
+  db-data:
