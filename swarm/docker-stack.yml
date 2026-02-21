@@ -78,9 +78,9 @@ services:
     volumes:
       - kong-config:/var/lib/kong
     configs:
-      - source: kong_template
+      - source: kong_template_v1
         target: /tmp/kong-template.yml
-      - source: kong_init_script
+      - source: kong_init_script_v1
         target: /tmp/kong-init.sh
         mode: 0755
     command: sh /tmp/kong-init.sh
@@ -142,7 +142,7 @@ volumes:
     driver: local
 
 configs:
-  kong_template:
+  kong_template_v1:
     file: ./kong-template.yml
-  kong_init_script:
+  kong_init_script_v1:
     file: ./kong-init-swarm.sh
