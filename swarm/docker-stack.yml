@@ -11,6 +11,8 @@ services:
       POSTGRES_HOST_AUTH_METHOD: md5
     volumes:
       - db-data:/var/lib/postgresql/data
+    networks:
+      - supabase-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -h localhost"]
       interval: 5s
@@ -30,6 +32,8 @@ services:
     ports:
       - "6543:6543"
       - "5433:5433"
+    networks:
+      - supabase-net
     environment:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
@@ -54,6 +58,8 @@ services:
   # ─── pg-meta ──────────────────────────────────────────────────
   meta:
     image: supabase/postgres-meta:v0.84.2
+    networks:
+      - supabase-net
     environment:
       PG_META_PORT: 8080
       PG_META_DB_HOST: db
@@ -69,9 +75,11 @@ services:
         constraints:
           - node.role == manager
 
-  # ─── Kong Init (gera kong.yml inline e desliga) ───────────────
+  # ─── Kong Init ────────────────────────────────────────────────
   kong-init:
     image: alpine:3.19
+    networks:
+      - supabase-net
     environment:
       KONG_ADMIN_USER: ${KONG_ADMIN_USER}
       KONG_ADMIN_PASSWORD: ${KONG_ADMIN_PASSWORD}
@@ -153,6 +161,8 @@ services:
     image: kong:2.8.1
     ports:
       - "8000:8000"
+    networks:
+      - supabase-net
     environment:
       KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
@@ -185,6 +195,8 @@ services:
   # ─── Supabase Studio ──────────────────────────────────────────
   studio:
     image: supabase/studio:20250113-83c9420
+    networks:
+      - supabase-net
     environment:
       STUDIO_PG_META_URL: http://meta:8080
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -202,6 +214,11 @@ services:
       placement:
         constraints:
           - node.role == manager
+
+networks:
+  supabase-net:
+    driver: overlay
+    attachable: true
 
 volumes:
   db-data:
