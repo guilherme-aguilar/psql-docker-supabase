@@ -69,7 +69,7 @@ services:
         constraints:
           - node.role == manager
 
-  # ─── Kong Init (gera kong.yml e desliga) ──────────────────────
+  # ─── Kong Init (gera kong.yml inline e desliga) ───────────────
   kong-init:
     image: alpine:3.19
     environment:
@@ -77,20 +77,76 @@ services:
       KONG_ADMIN_PASSWORD: ${KONG_ADMIN_PASSWORD}
     volumes:
       - kong-config:/var/lib/kong
-    configs:
-      - source: kong_template_v1
-        target: /tmp/kong-template.yml
-      - source: kong_init_script_v1
-        target: /tmp/kong-init.sh
-        mode: 0755
-    command: sh /tmp/kong-init.sh
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        echo "Gerando kong.yml..."
+        cat > /var/lib/kong/kong.yml << KONGEOF
+        _format_version: "1.1"
+
+        consumers:
+          - username: $$KONG_ADMIN_USER
+            basicauth_credentials:
+              - username: $$KONG_ADMIN_USER
+                password: $$KONG_ADMIN_PASSWORD
+
+        services:
+          - name: pg-meta
+            url: http://meta:8080
+            routes:
+              - name: pg-meta-all
+                strip_path: true
+                paths:
+                  - /pg/
+
+          - name: studio
+            url: http://studio:3000
+            routes:
+              - name: studio-route
+                strip_path: false
+                paths:
+                  - /
+                regex_priority: 0
+            plugins:
+              - name: basic-auth
+                config:
+                  hide_credentials: true
+
+        plugins:
+          - name: cors
+            config:
+              origins:
+                - "*"
+              methods:
+                - GET
+                - POST
+                - PUT
+                - PATCH
+                - DELETE
+                - OPTIONS
+              headers:
+                - Accept
+                - Authorization
+                - Content-Type
+                - apikey
+                - X-Client-Info
+              max_age: 1728000
+              credentials: true
+        KONGEOF
+        sed -i "s/\$\$KONG_ADMIN_USER/$$KONG_ADMIN_USER/g" /var/lib/kong/kong.yml
+        sed -i "s/\$\$KONG_ADMIN_PASSWORD/$$KONG_ADMIN_PASSWORD/g" /var/lib/kong/kong.yml
+        echo "kong.yml gerado!"
+        cat /var/lib/kong/kong.yml
     deploy:
       replicas: 1
       restart_policy:
-        condition: none
+        condition: on-failure
+        max_attempts: 3
       placement:
         constraints:
-          - node.role == manager   # mesmo nó que o kong
+          - node.role == manager
 
   # ─── Kong (API Gateway) ───────────────────────────────────────
   kong:
@@ -106,13 +162,25 @@ services:
       KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
     volumes:
       - kong-config:/var/lib/kong
+    entrypoint:
+      - sh
+      - -c
+      - |
+        echo 'Aguardando kong.yml...';
+        until [ -s /var/lib/kong/kong.yml ]; do
+          sleep 2;
+        done;
+        echo 'kong.yml encontrado, iniciando Kong...';
+        /docker-entrypoint.sh kong docker-start
     deploy:
       replicas: 1
       restart_policy:
         condition: on-failure
+        delay: 5s
+        max_attempts: 10
       placement:
         constraints:
-          - node.role == manager   # mesmo nó que o kong-init
+          - node.role == manager
 
   # ─── Supabase Studio ──────────────────────────────────────────
   studio:
@@ -140,9 +208,3 @@ volumes:
     driver: local
   kong-config:
     driver: local
-
-configs:
-  kong_template_v1:
-    file: ./kong-template.yml
-  kong_init_script_v1:
-    file: ./kong-init-swarm.sh
