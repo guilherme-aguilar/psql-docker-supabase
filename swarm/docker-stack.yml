@@ -24,7 +24,7 @@ services:
         condition: on-failure
       placement:
         constraints:
-          - node.role == manager
+          - node.hostname == cmt-database
 
   # ─── Supavisor ────────────────────────────────────────────────
   supavisor:
@@ -53,7 +53,7 @@ services:
         condition: on-failure
       placement:
         constraints:
-          - node.role == manager
+          - node.hostname == cmt-database
 
   # ─── pg-meta ──────────────────────────────────────────────────
   meta:
