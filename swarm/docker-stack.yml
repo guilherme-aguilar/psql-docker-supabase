@@ -174,7 +174,21 @@ services:
 
   # ─── Supabase Studio ──────────────────────────────────────────
   studio:
-    image: supabase/studio:20250113-83c94
+    image: supabase/studio:20250113-83c9420  # <--- Verifique se o '20' final está aqui
+    networks:
+      - supa-network
+    environment:
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SUPABASE_URL: http://kong:8000
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+    healthcheck:
+      disable: true
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
 
 
 networks:
