@@ -43,8 +43,6 @@ services:
       POSTGRES_PORT: 5432
       POSTGRES_DB: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POOLER_PORT: 5433
-      PROXY_PORT: 6543
       CLUSTER_POSTGRES: "true"
       DATABASE_URL: "ecto://supabase_admin:${POSTGRES_PASSWORD}@db:5432/postgres"
       CLUSTER_POSTGRES: "true"
