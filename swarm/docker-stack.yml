@@ -31,7 +31,7 @@ services:
 
   # ─── PgBouncer (Novo Pooler para o Zabbix) ────────────────────
   pgbouncer:
-    image: edoburu/pgbouncer:1.22.1
+    image: edoburu/pgbouncer:latest
     ports:
       - "6543:5432"  # Expõe na 6543 (sua porta escolhida) -> 5432 interna do PgBouncer
     networks:
