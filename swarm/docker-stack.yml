@@ -46,7 +46,7 @@ services:
       POOL_MODE: session
       MAX_CLIENT_CONN: 1000
       DEFAULT_POOL_SIZE: 100
-      IGNORE_STARTUP_PARAMETERS: extra_float_digits
+      IGNORE_STARTUP_PARAMETERS: extra_float_digits,options,search_path
       # ─── ADICIONE ESTA LINHA ───
       AUTH_TYPE: scram-sha-256
     deploy:
