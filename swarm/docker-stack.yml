@@ -29,33 +29,26 @@ services:
         constraints:
           - node.hostname == cmt-database
 
-  # ─── Supavisor (Pooler para o Zabbix) ─────────────────────────
-  supavisor:
-    image: supabase/supavisor:2.5.1
+  # ─── PgBouncer (Novo Pooler para o Zabbix) ────────────────────
+  pgbouncer:
+    image: edoburu/pgbouncer:1.22.1
     ports:
-      - "6543:6543"
-      - "5433:5433"
+      - "6543:5432"  # Expõe na 6543 (sua porta escolhida) -> 5432 interna do PgBouncer
     networks:
       - supa-network
       - dokploy-network
     environment:
-      POSTGRES_HOST: database-supabase-tjvayr_db
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      # Use o nome do serviço completo na URL também!
-      DATABASE_URL: "ecto://postgres:${POSTGRES_PASSWORD}@database-supabase-tjvayr_db:5432/postgres"
-      # ... (restante das variáveis)
-      CLUSTER_POSTGRES: "true"
-      PROXY_PORT: 6543
-      POOLER_PORT: 5433
-      DEFAULT_DB: postgres
-      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
-      VAULT_ENC_KEY: ${VAULT_ENC_KEY}
-      API_JWT_SECRET: ${JWT_SECRET}
-      METRICS_JWT_SECRET: ${JWT_SECRET}
-      REGION: local
-      ERL_AFLAGS: -proto_dist inet_tcp
+      DB_HOST: database-supabase-tjvayr_db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: postgres
+      # O Zabbix exige conexões persistentes para suas queries complexas
+      POOL_MODE: session
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 100
+      # Evita erros de parâmetros de inicialização que o Zabbix pode enviar
+      IGNORE_STARTUP_PARAMETERS: extra_float_digits
     deploy:
       replicas: 1
       restart_policy:
@@ -176,7 +169,7 @@ services:
 
   # ─── Supabase Studio ──────────────────────────────────────────
   studio:
-    image: supabase/studio:20250113-83c9420  # <--- Verifique se o '20' final está aqui
+    image: supabase/studio:20250113-83c9420
     networks:
       - supa-network
     environment:
