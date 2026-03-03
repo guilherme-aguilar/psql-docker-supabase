@@ -18,9 +18,9 @@ services:
       - dokploy-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -h localhost"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
     deploy:
       replicas: 1
       restart_policy:
@@ -29,7 +29,7 @@ services:
         constraints:
           - node.hostname == cmt-database
 
-  # ─── Supavisor ────────────────────────────────────────────────
+  # ─── Supavisor (Pooler para o Zabbix) ─────────────────────────
   supavisor:
     image: supabase/supavisor:2.5.1
     ports:
@@ -45,7 +45,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       DATABASE_URL: "ecto://postgres:${POSTGRES_PASSWORD}@db:5432/postgres"
       CLUSTER_POSTGRES: "true"
-      # Ajustes para garantir que as portas de pool abram corretamente
       PROXY_PORT: 6543
       POOLER_PORT: 5433
       DEFAULT_DB: postgres
@@ -79,13 +78,11 @@ services:
       disable: true
     deploy:
       replicas: 1
-      restart_policy:
-        condition: any
       placement:
         constraints:
           - node.role == manager
 
-  # ─── Kong Init ────────────────────────────────────────────────
+  # ─── Kong Init (Gerador de Config) ────────────────────────────
   kong-init:
     image: alpine:3.19
     networks:
@@ -177,30 +174,4 @@ services:
 
   # ─── Supabase Studio ──────────────────────────────────────────
   studio:
-    image: supabase/studio:20250113-83c9420
-    networks:
-      - supa-network
-    environment:
-      STUDIO_PG_META_URL: http://meta:8080
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      SUPABASE_URL: http://kong:8000
-      AUTH_JWT_SECRET: ${JWT_SECRET}
-    deploy:
-      replicas: 1
-      placement:
-        constraints:
-          - node.role == manager
-
-networks:
-  supa-network:
-    driver: overlay
-    ipam:
-      config:
-        # Mudando a subnet para evitar o erro de Overlap no Swarm
-        - subnet: 10.55.0.0/24
-  dokploy-network:
-    external: true
-
-volumes:
-  db-data:
-  kong-config:
+    image: supabase/studio:20250113-83c94
