@@ -175,3 +175,18 @@ services:
   # ─── Supabase Studio ──────────────────────────────────────────
   studio:
     image: supabase/studio:20250113-83c94
+
+
+networks:
+  supa-network:
+    driver: overlay
+    attachable: true
+    ipam:
+      config:
+        - subnet: 172.20.50.0/24
+  dokploy-network:
+    external: true
+
+volumes:
+  db-data:
+  kong-config:
